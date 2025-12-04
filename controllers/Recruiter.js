@@ -115,7 +115,7 @@ export const editJD = async (req, res) => {
 
     // if (jd.recruiter.toString() !== req.user._id.toString()) {
     //   return res.status(403).json({ message: "Unauthorized to edit this JD." });
-    // }
+    // } 
 
     // AI prompt for rewriting JD
     const editPrompt = `

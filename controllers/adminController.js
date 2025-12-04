@@ -273,7 +273,6 @@ export const updateHR = asyncHandler(async (req, res, next) => {
       updates,
       { new: true }
     ).select('-password');
-
     if (!hrUser) {
       return next(new ErrorResponse('HR user not found', 404));
     }

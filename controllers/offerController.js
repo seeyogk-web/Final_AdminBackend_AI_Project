@@ -53,6 +53,7 @@ export const createOffer = asyncHandler(async(req, res, next) => {
         currency,
         attachments,
         status:"JD pending",
+        isJDCreated:true,
     });
 
     const html = offerAssignedTemplate(
@@ -219,7 +220,7 @@ export const getRmgOffersWithJDs = asyncHandler(async (req, res, next) => {
       console.log('JD Results:', jds);
 
       const jdDetails = jds.map((jd) => {
-        // extract counts from JD (JD model is said to hold applicant/filtered counts)
+        // extract counts from JD (JD model is said to hold applicant/filtered counts) 
         const totalApplicants = Array.isArray(jd.applicants) ? jd.applicants.length
           : (typeof jd.applicantsCount === 'number' ? jd.applicantsCount : 0);
 
@@ -230,7 +231,7 @@ export const getRmgOffersWithJDs = asyncHandler(async (req, res, next) => {
 
         let applicantsByStatus = {};
         if (Array.isArray(jd.applicants)) {
-          jd.applicants.forEach(a => {
+          jd.applicants.forEach(a => { 
             const s = a && a.status ? a.status : 'unknown';
             applicantsByStatus[s] = (applicantsByStatus[s] || 0) + 1;
           });

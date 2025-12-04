@@ -17,9 +17,8 @@ const candidateSchema = new mongoose.Schema(
     password: { type: String, required: true, minlength: 6, select: false },
 
     phone: { type: String, required: true },
-
     resume: { type: String,  },
-
+    skills: { type: [String] },
     avatar: { type: String },
 
     lastlogin: { type: Date },

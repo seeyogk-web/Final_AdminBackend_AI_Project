@@ -76,6 +76,10 @@ const offerSchema = new mongoose.Schema({
     type:[String],
     default:[],
    },
+   isJDCreated:{
+    type:Boolean,
+    default:false
+   }
 },{timestamps:true});
 
 export default mongoose.model("Offer", offerSchema)

@@ -8,11 +8,11 @@ import { config } from "../config/index.js";
 
 // Register candidate
 export const registerCandidate = asyncHandler(async (req, res, next) => {
-  const { name, email, password, phone } = req.body;
-  if (!name || !email || !password || !phone) return next(new errorResponse("All fields required", 400));
+  const { name, email, password, phone, skills } = req.body;
+  if (!name || !email || !password || !phone || !skills) return next(new errorResponse("All fields required", 400));
   const existing = await Candidate.findOne({ email });
   if (existing) return next(new errorResponse("Email already exists", 400));
-  const candidate = await Candidate.create({ name, email, password, phone, resume: "" });
+  const candidate = await Candidate.create({ name, email, password, phone, skills, resume: "" });
   sendTokenResponse(candidate, 201, res);
 });
 
@@ -26,34 +26,6 @@ export const loginCandidate = asyncHandler(async (req, res, next) => {
   if (!isMatch) return next(new errorResponse("Invalid credentials", 401));
   sendTokenResponse(candidate, 200, res);
 });
-
-// Apply for a job (JD)
-// export const applyJob = asyncHandler(async (req, res, next) => {
-//   const { jdId } = req.params;
-//   const { name, email, phone, reallocate } = req.body;
-//   if (!req.files || !req.files.resume) return next(new errorResponse("Resume file required", 400));
-//   const resumeFile = req.files.resume;
-//   const resumeUrl = await cloudinary.uploader.upload(resumeFile.tempFilePath, { folder: 'candidates' });
-//   const candidate = await Candidate.findOne({ email });
-//   if (!candidate) return next(new errorResponse("Candidate not found", 404));
-//   const jd = await JD.findById(jdId);
-//   if (!jd) return next(new errorResponse("JD not found", 404));
-//   // Prevent duplicate application
-//   if (jd.appliedCandidates.some(c => c.candidate.toString() === candidate._id.toString())) {
-//     return next(new errorResponse("Already applied to this job", 400));
-//   }
-//   jd.appliedCandidates.push({
-//     candidate: candidate._id,
-//     resume: resumeUrl,
-//     name,
-//     email,
-//     phone,
-//     reallocate: reallocate === "yes" || reallocate === true,
-//     status: "pending",
-//   });
-//   await jd.save();
-//   res.status(201).json({ success: true, message: "Applied successfully" });
-// });
 
 
 export const applyJob = asyncHandler(async (req, res, next) => {
@@ -102,7 +74,7 @@ export const applyJob = asyncHandler(async (req, res, next) => {
 
 // Get all jobs applied by candidate
 export const getAppliedJobs = asyncHandler(async (req, res, next) => {
-  const candidateId = req.user._id;
+  const candidateId = req.candidate._id;
   const jds = await JD.find({ "appliedCandidates.candidate": candidateId });
   res.json({ success: true, jobs: jds });
 });
@@ -113,3 +85,142 @@ function sendTokenResponse(candidate, statusCode, res) {
   const token = jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpire });
   res.status(statusCode).json({ success: true, token });
 }
+
+
+export const getCandidateJdCounts = asyncHandler(async (req, res, next) => {
+  try {
+    const candidateId = req.candidate._id;
+    const [totalAppliedJds, filteredJds, unfilteredJds] = await Promise.all([
+      JD.countDocuments({ "appliedCandidates.candidate": candidateId }),
+      JD.countDocuments({ "filteredCandidates.candidate": candidateId }),
+      JD.countDocuments({ "unfilteredCandidates.candidate": candidateId })
+    ]);
+
+    res.status(200).json({
+      success: true,
+      counts: {
+        totalAppliedJds,
+        filteredJds,
+        unfilteredJds
+      }
+    });
+
+  } catch (err) {
+    return next(
+      new errorResponse(err.message || "Failed to fetch JD counts", 500)
+    );
+  }
+});
+
+export const getjobrecommendationsForCandidate = asyncHandler(async (req, res, next) => {
+  try {
+    const candidateId = req.candidate._id;
+
+    const candidate = await Candidate.findById(candidateId);
+    if (!candidate) {
+      return next(new errorResponse("Candidate not found", 404));
+    }
+
+    // Ensure fields are arrays or null
+    const skills = Array.isArray(candidate.skills) ? candidate.skills : [];
+    const preferredLocations = Array.isArray(candidate.preferredLocations)
+      ? candidate.preferredLocations
+      : [];
+
+    const currentTitle = candidate.currentTitle || "";
+
+    // Build dynamic OR conditions safely
+    const conditions = [];
+
+    if (skills.length > 0) {
+      conditions.push({ skills: { $in: skills } });
+    }
+
+    if (preferredLocations.length > 0) {
+      conditions.push({ location: { $in: preferredLocations } });
+    }
+
+    if (currentTitle.trim() !== "") {
+      conditions.push({ title: { $regex: currentTitle, $options: "i" } });
+    }
+
+    // If no conditions found → return empty list
+    if (conditions.length === 0) {
+      return res.status(200).json({
+        success: true,
+        data: [],
+        message: "No recommendation criteria found for this candidate."
+      });
+    }
+
+    const jds = await JD.find({
+      $or: conditions
+    }).limit(10);
+
+    res.status(200).json({
+      success: true,
+      data: jds
+    });
+
+  } catch (err) {
+    return next(
+      new errorResponse(err.message || "Failed to fetch job recommendations", 500)
+    );
+  }
+});
+
+export const showlatestFiveJdsForCandidate = asyncHandler(async (req, res, next) => {
+  try {
+    const candidateId = req.candidate._id;
+    const jds = await JD.find({ "appliedCandidates.candidate": candidateId })
+      .sort({ createdAt: -1 })
+      .limit(5);
+    res.status(200).json({ success: true, data: jds });
+  } catch (err) {
+    return next(
+      new errorResponse(err.message || "Failed to fetch latest JDs", 500)
+    );
+  }
+});
+
+
+// export const getlatestJdsForCandidate = asyncHandler(async (req, res, next) => {
+//   try {
+//     const candidateId = req.user._id;
+//     const jds = await JD.find({ "appliedCandidates.candidate": candidateId })
+//       .sort({ createdAt: -1 })
+//       .limit(5);
+//     res.status(200).json({ success: true, data: jds });
+//   } catch (err) {
+//     return next(
+//       new errorResponse(err.message || "Failed to fetch latest JDs", 500)
+//     );
+//   }
+// });
+// Apply for a job (JD)
+// export const applyJob = asyncHandler(async (req, res, next) => {
+//   const { jdId } = req.params;
+//   const { name, email, phone, reallocate } = req.body;
+//   if (!req.files || !req.files.resume) return next(new errorResponse("Resume file required", 400));
+//   const resumeFile = req.files.resume;
+//   const resumeUrl = await cloudinary.uploader.upload(resumeFile.tempFilePath, { folder: 'candidates' });
+//   const candidate = await Candidate.findOne({ email });
+//   if (!candidate) return next(new errorResponse("Candidate not found", 404));
+//   const jd = await JD.findById(jdId);
+//   if (!jd) return next(new errorResponse("JD not found", 404));
+//   // Prevent duplicate application
+//   if (jd.appliedCandidates.some(c => c.candidate.toString() === candidate._id.toString())) {
+//     return next(new errorResponse("Already applied to this job", 400));
+//   }
+//   jd.appliedCandidates.push({
+//     candidate: candidate._id,
+//     resume: resumeUrl,
+//     name,
+//     email,
+//     phone,
+//     reallocate: reallocate === "yes" || reallocate === true,
+//     status: "pending",
+//   });
+//   await jd.save();
+//   res.status(201).json({ success: true, message: "Applied successfully" });
+// });
