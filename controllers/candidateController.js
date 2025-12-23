@@ -140,11 +140,10 @@ export const sendBulkJDInvite = asyncHandler(async (req, res, next) => {
       jd.companyName || 'Our Company',
       applyUrl
     );
-    //jd.jobSummary || jd.title ||
     try {
       await sendEmail({
         to: candidate.email,
-        subject: `New Opening: ${ jd.jobTitle}`,
+        subject: `New Opening: ${jd.jobSummary || jd.title || jd.jobTitle}`,
         html
       });
       sentCount++;
