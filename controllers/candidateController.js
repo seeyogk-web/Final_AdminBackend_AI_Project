@@ -280,8 +280,17 @@ export const showlatestFiveJdsForCandidate = asyncHandler(async (req, res, next)
 export const getAppliedjd = asyncHandler(async (req, res, next) => {
   try {
     const candidateId = req.candidate._id;
-    const jds = await JD.find({ "appliedCandidates.candidate": candidateId });
-    res.status(200).json({ success: true, data: jds });
+    // Populate offerId to get jobTitle from Offer model
+    const jds = await JD.find({ "appliedCandidates.candidate": candidateId })
+      .populate({ path: "offerId", select: "jobTitle" })
+      .select("jobSummary companyName responsibilities requirements benefits additionalNotes appliedCandidates offerId");
+    // Map to include jobTitle from offerId
+    const result = jds.map(jd => ({
+      ...jd.toObject(),
+      jobTitle: jd.offerId?.jobTitle || null,
+      jobSummary: jd.jobSummary || null
+    }));
+    res.status(200).json({ success: true, data: result });
   } catch (err) {
     return next(
       new errorResponse(err.message || "Failed to fetch applied JDs", 500)
