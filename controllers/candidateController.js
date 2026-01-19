@@ -320,13 +320,19 @@ export const getAppliedjd = asyncHandler(async (req, res, next) => {
     const jds = await JD.find({ "appliedCandidates.candidate": candidateId })
       .populate({ path: "offerId", select: "jobTitle" })
       .select("jobSummary companyName responsibilities requirements benefits additionalNotes appliedCandidates offerId createdAt");
-    // Map to include jobTitle from offerId and createdAt
-    const result = jds.map(jd => ({
-      ...jd.toObject(),
-      jobTitle: jd.offerId?.jobTitle || null,
-      jobSummary: jd.jobSummary || null,
-      createdAt: jd.createdAt
-    }));
+    // Map to include jobTitle from offerId, createdAt, and applied date from appliedCandidates
+    const result = jds.map(jd => {
+      const appliedCandidate = jd.appliedCandidates.find(
+        (ac) => ac.candidate.toString() === candidateId.toString()
+      );
+      return {
+        ...jd.toObject(),
+        jobTitle: jd.offerId?.jobTitle || null,
+        jobSummary: jd.jobSummary || null,
+        createdAt: jd.createdAt,
+        appliedDate: appliedCandidate?.appliedAt || null
+      };
+    });
     res.status(200).json({ success: true, data: result });
   } catch (err) {
     return next(
